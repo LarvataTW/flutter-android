@@ -9,4 +9,4 @@ RUN ${HOME}/flutter/bin/flutter precache --no-web --no-linux --no-windows --no-f
 RUN sudo apt update
 RUN sudo apt install -y ruby ruby-dev rubygems
 # Install bundler.
-RUN gem install bundler -NV
+RUN sudo gem install bundler -NV
