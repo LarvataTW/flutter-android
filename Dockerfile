@@ -8,6 +8,6 @@ RUN wget https://storage.googleapis.com/flutter_infra_release/releases/stable/li
 RUN ${HOME}/flutter/bin/flutter precache --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
 RUN sudo apt update
 RUN sudo apt install -y ruby ruby-dev rubygems \
-  && rm -rf /var/lib/apt/lists/*
+  && sudo rm -rf /var/lib/apt/lists/*
 # Install bundler.
 RUN sudo gem install bundler -NV
