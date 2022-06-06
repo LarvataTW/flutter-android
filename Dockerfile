@@ -1,7 +1,7 @@
 FROM cimg/android:2022.04.1
 ENV PATH="/home/circleci/flutter/bin:${PATH}"
 # Install and pre-cache Flutter.
-RUN wget https://storage.googleapis.com/flutter_infra/releases/stable/linux/flutter_linux_3.0.1-stable.tar.xz && \
+RUN wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.0.1-stable.tar.xz && \
   tar xf flutter_linux_3.0.1-stable.tar.xz -C ${HOME} && \
   rm flutter_linux_3.0.1-stable.tar.xz
 
