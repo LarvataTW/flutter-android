@@ -11,5 +11,7 @@ RUN sudo apt install -y ruby ruby-dev rubygems \
   && sudo rm -rf /var/lib/apt/lists/*
 ENV GEM_HOME="${HOME}/.gem"
 ENV PATH="${HOME}/.gem/bin:${PATH}"
+RUN mkdir -p "${HOME}/.gem"
+RUN sudo chown -R "$(whoami)" "${HOME}/.gem"
 # Install bundler.
 RUN gem install bundler -NV
