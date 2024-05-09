@@ -55,5 +55,5 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/larvatatw/flutter-android:cimg2023.06_flutter3.13.8
+          tags: ghcr.io/larvatatw/flutter-android:cimg2023.06_flutter3.19.6
           labels: ${{ steps.meta.outputs.labels }}
