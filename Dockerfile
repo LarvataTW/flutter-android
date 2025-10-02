@@ -18,8 +18,10 @@ RUN gem install bundler -NV
 
 # ---- Android SDK components (CMake only; do NOT install or pin any NDK here) ----
 # cimg/android has ANDROID_SDK_ROOT preset (usually /opt/android/sdk)
-# RUN yes | sdkmanager --licenses
+RUN yes | sdkmanager --licenses >/dev/null || true
 RUN sdkmanager "platform-tools" "cmake;3.22.1"
+ENV PATH="$ANDROID_SDK_ROOT/cmake/3.22.1/bin:${PATH}"
+RUN sdkmanager --list | head -n 40 && ninja --version && cmake --version
 
 # (Intentionally NOT adding a specific cmake bin to PATH to keep image generic)
 # Ninja will be found via system 'ninja' from apt (ninja-build).
