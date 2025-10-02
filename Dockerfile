@@ -17,7 +17,7 @@ RUN sudo chown -R "$(whoami)" "/home/circleci/.gem"
 RUN gem install bundler -NV
 
 # ---- Android SDK components (CMake only; do NOT install or pin any NDK here) ----
-cimg/android has ANDROID_SDK_ROOT preset (usually /opt/android/sdk)
+# cimg/android has ANDROID_SDK_ROOT preset (usually /opt/android/sdk)
 RUN yes | sdkmanager --licenses
 RUN sdkmanager "platform-tools" "cmake;3.22.1"
 
