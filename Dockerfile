@@ -1,27 +1,31 @@
 FROM cimg/android:2023.06
-ENV PATH="/home/circleci/flutter/bin:${PATH}"
-# Install and pre-cache Flutter.
-RUN wget https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.32.0-stable.tar.xz && \
-  tar xf flutter_linux_3.32.0-stable.tar.xz -C ${HOME} && \
-  rm flutter_linux_3.32.0-stable.tar.xz
 
-RUN ${HOME}/flutter/bin/flutter precache --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
-RUN sudo apt update
-RUN sudo apt install -y ruby ruby-dev rubygems ninja-build \
-  && sudo rm -rf /var/lib/apt/lists/*
+# ---- Flutter 3.32.0 ----
+ENV PATH="/home/circleci/flutter/bin:${PATH}"
+RUN wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.32.0-stable.tar.xz \
+ && tar xf flutter_linux_3.32.0-stable.tar.xz -C ${HOME} \
+ && rm -f flutter_linux_3.32.0-stable.tar.xz
+RUN ${HOME}/flutter/bin/flutter precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
+
+# ---- 系統工具（含 ninja 備援）----
+RUN sudo apt-get update \
+ && sudo apt-get install -y ruby ruby-dev rubygems ninja-build \
+ && sudo rm -rf /var/lib/apt/lists/*
 ENV GEM_HOME="/home/circleci/.gem"
 ENV PATH="/home/circleci/.gem/bin:${PATH}"
-RUN mkdir -p "/home/circleci/.gem"
-RUN sudo chown -R "$(whoami)" "/home/circleci/.gem"
-# Install bundler.
+RUN mkdir -p "/home/circleci/.gem" && sudo chown -R "$(whoami)" "/home/circleci/.gem"
 RUN gem install bundler -NV
 
-# ---- Android SDK components (CMake only; do NOT install or pin any NDK here) ----
-# cimg/android has ANDROID_SDK_ROOT preset (usually /opt/android/sdk)
-RUN yes | sdkmanager --licenses >/dev/null || true
-RUN sdkmanager "platform-tools" "cmake;3.22.1"
-ENV PATH="$ANDROID_SDK_ROOT/cmake/3.22.1/bin:${PATH}"
-RUN sdkmanager --list | head -n 40 && ninja --version && cmake --version
+# ---- 統一 SDK 根目錄 + PATH ----
+ENV ANDROID_SDK_ROOT=/opt/android/sdk
+ENV ANDROID_HOME=/opt/android/sdk
+ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/cmake/3.22.1/bin:${PATH}"
 
-# (Intentionally NOT adding a specific cmake bin to PATH to keep image generic)
-# Ninja will be found via system 'ninja' from apt (ninja-build).
+# ---- 接受授權並安裝 CMake / API 35 / Build-Tools 35 ----
+RUN yes | sdkmanager --licenses >/dev/null || true
+RUN sdkmanager "platform-tools" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
+
+# ---- 快速檢查（可留可刪）----
+RUN ninja --version && cmake --version && \
+    ls -al $ANDROID_SDK_ROOT/cmake/3.22.1/bin && \
+    ls -al $ANDROID_SDK_ROOT/platforms && ls -al $ANDROID_SDK_ROOT/build-tools
