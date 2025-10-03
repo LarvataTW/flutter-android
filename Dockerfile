@@ -25,7 +25,7 @@ ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/cmake/3.2
 RUN yes | sdkmanager --licenses >/dev/null || true
 RUN sdkmanager "platform-tools" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
 
-# ---- 快速檢查（可留可刪）----
-RUN ninja --version && cmake --version && \
-    ls -al $ANDROID_SDK_ROOT/cmake/3.22.1/bin && \
-    ls -al $ANDROID_SDK_ROOT/platforms && ls -al $ANDROID_SDK_ROOT/build-tools
+# # ---- 快速檢查（可留可刪）----
+# RUN ninja --version && cmake --version && \
+#     ls -al $ANDROID_SDK_ROOT/cmake/3.22.1/bin && \
+#     ls -al $ANDROID_SDK_ROOT/platforms && ls -al $ANDROID_SDK_ROOT/build-tools
