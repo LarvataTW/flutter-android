@@ -1,32 +1,88 @@
-FROM cimg/android:2023.06
+# 以 CircleCI 官方 Android 映像為基底，內含常用 Android/CI 工具。
+FROM cimg/android:2026.03.1
 
-# ---- Flutter 3.32.0 ----
-ENV PATH="/home/circleci/flutter/bin:${PATH}"
-RUN wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.32.0-stable.tar.xz \
- && tar xf flutter_linux_3.32.0-stable.tar.xz -C ${HOME} \
- && rm -f flutter_linux_3.32.0-stable.tar.xz
-RUN ${HOME}/flutter/bin/flutter precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
+# Flutter 版本（下載與安裝時使用）。
+ARG FLUTTER_VERSION=3.35.0
+# Android SDK 平台版本（提供對應 API level）。
+ARG ANDROID_PLATFORM=android-35
+# Android Build Tools 版本（Gradle/Android build 需要）。
+ARG BUILD_TOOLS_VERSION=35.0.0
+# CMake 版本（原生模組編譯會用到）。
+ARG CMAKE_VERSION=3.22.1
+# Temurin JDK 21 下載網址（手動安裝固定 JDK 版本）。
+ARG TEMURIN_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz"
 
-# ---- 系統工具（含 ninja 備援）----
+# 設定環境變數：
+# 1) 將 Flutter bin 加入 PATH
+# 2) 設定 Ruby gem 安裝目錄
+# 3) 指定 Java 安裝位置
+# 4) 指定 Android SDK 位置
+ENV PATH="/home/circleci/flutter/bin:${PATH}" \
+    GEM_HOME="/home/circleci/.gem" \
+    JAVA_HOME="/opt/java/openjdk" \
+    ANDROID_SDK_ROOT=/opt/android/sdk \
+    ANDROID_HOME=/opt/android/sdk
+# 追加 PATH，確保 Java / gem / sdkmanager / cmake 指令可直接使用。
+ENV PATH="$JAVA_HOME/bin:/home/circleci/.gem/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/cmake/${CMAKE_VERSION}/bin:${PATH}"
+
+# 安裝 Temurin JDK 21：
+# 1) 建立 Java 安裝目錄
+# 2) 下載 JDK 壓縮檔
+# 3) 解壓到 /opt/java
+# 4) 刪除暫存壓縮檔
+# 5) 建立固定符號連結 /opt/java/openjdk
+# 6) 驗證 java 版本
+RUN sudo mkdir -p /opt/java \
+ && sudo wget -qO /tmp/temurin-jdk.tar.gz "${TEMURIN_URL}" \
+ && sudo tar -xzf /tmp/temurin-jdk.tar.gz -C /opt/java \
+ && sudo rm -f /tmp/temurin-jdk.tar.gz \
+ && sudo ln -sfn /opt/java/jdk-21.0.10+7 /opt/java/openjdk \
+ && java -version
+
+# 安裝 Flutter SDK：
+# 1) 下載指定版本 Flutter
+# 2) 解壓到使用者家目錄
+# 3) 刪除下載檔
+# 4) 關閉 Flutter analytics
+# 5) 只預先快取 Android 所需 artifacts（排除其他平台）
+RUN wget -q "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+ && tar xf "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" -C "${HOME}" \
+ && rm -f "flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" \
+ && "${HOME}/flutter/bin/flutter" config --no-analytics \
+ && "${HOME}/flutter/bin/flutter" precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
+
+# 安裝系統套件：
+# 1) 更新 apt 索引
+# 2) 安裝 Ruby / Ruby 開發套件 / RubyGems / Ninja
+# 3) 清理 apt 快取以縮小映像
 RUN sudo apt-get update \
- && sudo apt-get install -y ruby ruby-dev rubygems ninja-build \
+ && sudo apt-get install -y --no-install-recommends ruby ruby-dev rubygems ninja-build \
  && sudo rm -rf /var/lib/apt/lists/*
-ENV GEM_HOME="/home/circleci/.gem"
-ENV PATH="/home/circleci/.gem/bin:${PATH}"
-RUN mkdir -p "/home/circleci/.gem" && sudo chown -R "$(whoami)" "/home/circleci/.gem"
-RUN gem install bundler -NV
 
-# ---- 統一 SDK 根目錄 + PATH ----
-ENV ANDROID_SDK_ROOT=/opt/android/sdk
-ENV ANDROID_HOME=/opt/android/sdk
-ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/cmake/3.22.1/bin:${PATH}"
+# 設定 Ruby gem 環境：
+# 1) 建立 GEM_HOME 目錄
+# 2) 修正目錄擁有者，避免權限問題
+# 3) 安裝 bundler（-N 不安裝文件）
+RUN mkdir -p "${GEM_HOME}" \
+ && sudo chown -R "$(whoami)" "${GEM_HOME}" \
+ && gem install bundler -N
 
-# ---- 接受授權並安裝 CMake / API 35 / Build-Tools 35 ----
-RUN yes | sdkmanager --licenses >/dev/null || true
-RUN sdkmanager "platform-tools" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
+# 安裝 Android SDK 元件：
+# 1) 先嘗試接受授權（失敗不終止，避免互動阻塞）
+# 2) 安裝 platform-tools / 指定平台 / build-tools / cmake
+RUN yes | sdkmanager --licenses >/dev/null || true \
+ && sdkmanager \
+    "platform-tools" \
+    "platforms;${ANDROID_PLATFORM}" \
+    "build-tools;${BUILD_TOOLS_VERSION}" \
+    "cmake;${CMAKE_VERSION}"
 
-# ---- 建立 symlink，確保 /home/circleci/android-sdk 與 /opt/android/sdk 指到同一份 ----
+# 暫時切到 root 進行系統層級路徑調整。
 USER root
-RUN rm -rf /home/circleci/android-sdk && ln -s /opt/android/sdk /home/circleci/android-sdk
+# 相容舊路徑：
+# 1) 移除舊的 /home/circleci/android-sdk
+# 2) 建立連到 /opt/android/sdk 的符號連結
+RUN rm -rf /home/circleci/android-sdk \
+ && ln -s /opt/android/sdk /home/circleci/android-sdk
+# 切回一般使用者，符合 CI 執行慣例。
 USER circleci
-
