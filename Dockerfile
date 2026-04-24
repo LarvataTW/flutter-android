@@ -9,6 +9,7 @@ ARG ANDROID_PLATFORM=android-35
 ARG BUILD_TOOLS_VERSION=35.0.0
 # CMake 版本（原生模組編譯會用到）。
 ARG CMAKE_VERSION=3.22.1
+ARG CMDLINE_TOOLS_VERSION=11076708
 # Temurin JDK 21 下載網址（手動安裝固定 JDK 版本）。
 ARG TEMURIN_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz"
 
@@ -56,7 +57,7 @@ RUN wget -q "https://storage.googleapis.com/flutter_infra_release/releases/stabl
 # 2) 安裝 Ruby / Ruby 開發套件 / RubyGems / Ninja
 # 3) 清理 apt 快取以縮小映像
 RUN sudo apt-get update \
- && sudo apt-get install -y --no-install-recommends ruby ruby-dev rubygems ninja-build \
+ && sudo apt-get install -y --no-install-recommends ruby ruby-dev rubygems ninja-build unzip \
  && sudo rm -rf /var/lib/apt/lists/*
 
 # 設定 Ruby gem 環境：
@@ -67,15 +68,27 @@ RUN mkdir -p "${GEM_HOME}" \
  && sudo chown -R "$(whoami)" "${GEM_HOME}" \
  && gem install bundler -N
 
-# 安裝 Android SDK 元件：
-# 1) 先嘗試接受授權（失敗不終止，避免互動阻塞）
-# 2) 安裝 platform-tools / 指定平台 / build-tools / cmake
-RUN yes | sdkmanager --licenses >/dev/null || true \
- && sdkmanager \
+# 安裝 Android SDK（固定到 /opt/android/sdk）：
+# 1) 建立 SDK 目錄並修正權限
+# 2) 下載 commandline-tools 並放到 cmdline-tools/latest
+# 3) 接受授權並安裝必要元件
+# 4) 驗證關鍵目錄存在
+RUN sudo mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools" \
+ && sudo chown -R "$(whoami)" /opt/android \
+ && wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip" -O /tmp/cmdline-tools.zip \
+ && rm -rf "${ANDROID_SDK_ROOT}/cmdline-tools/latest" "${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools" \
+ && unzip -q /tmp/cmdline-tools.zip -d "${ANDROID_SDK_ROOT}/cmdline-tools" \
+ && mv "${ANDROID_SDK_ROOT}/cmdline-tools/cmdline-tools" "${ANDROID_SDK_ROOT}/cmdline-tools/latest" \
+ && rm -f /tmp/cmdline-tools.zip \
+ && yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null || true \
+ && sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" \
     "platform-tools" \
     "platforms;${ANDROID_PLATFORM}" \
     "build-tools;${BUILD_TOOLS_VERSION}" \
-    "cmake;${CMAKE_VERSION}"
+    "cmake;${CMAKE_VERSION}" \
+ && test -x "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
+ && test -d "${ANDROID_SDK_ROOT}/platform-tools" \
+ && test -d "${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION}"
 
 # 暫時切到 root 進行系統層級路徑調整。
 USER root
@@ -83,6 +96,8 @@ USER root
 # 1) 移除舊的 /home/circleci/android-sdk
 # 2) 建立連到 /opt/android/sdk 的符號連結
 RUN rm -rf /home/circleci/android-sdk \
- && ln -s /opt/android/sdk /home/circleci/android-sdk
+ && ln -s /opt/android/sdk /home/circleci/android-sdk \
+ && test -L /home/circleci/android-sdk \
+ && test -d /opt/android/sdk
 # 切回一般使用者，符合 CI 執行慣例。
 USER circleci
