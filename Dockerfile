@@ -10,6 +10,8 @@ ARG BUILD_TOOLS_VERSION=35.0.0
 # CMake 版本（原生模組編譯會用到）。
 ARG CMAKE_VERSION=3.22.1
 ARG CMDLINE_TOOLS_VERSION=11076708
+# NDK 版本（Flutter 預設使用）。
+ARG NDK_VERSION=27.0.12077973
 # Temurin JDK 21 下載網址（手動安裝固定 JDK 版本）。
 ARG TEMURIN_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10%2B7/OpenJDK21U-jdk_x64_linux_hotspot_21.0.10_7.tar.gz"
 
@@ -91,11 +93,16 @@ RUN sudo mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools" \
  && sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" \
     "platform-tools" \
     "platforms;${ANDROID_PLATFORM}" \
+    "platforms;android-33" \
+    "platforms;android-34" \
+    "platforms;android-36" \
     "build-tools;${BUILD_TOOLS_VERSION}" \
     "cmake;${CMAKE_VERSION}" \
+    "ndk;${NDK_VERSION}" \
  && test -x "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" \
  && test -d "${ANDROID_SDK_ROOT}/platform-tools" \
- && test -d "${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION}"
+ && test -d "${ANDROID_SDK_ROOT}/build-tools/${BUILD_TOOLS_VERSION}" \
+ && test -d "${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
 
 # 暫時切到 root 進行系統層級路徑調整。
 USER root
