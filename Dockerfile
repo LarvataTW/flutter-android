@@ -60,13 +60,20 @@ RUN sudo apt-get update \
  && sudo apt-get install -y --no-install-recommends ruby ruby-dev rubygems ninja-build unzip \
  && sudo rm -rf /var/lib/apt/lists/*
 
+# Fastlane 版本（預裝進 image，CI cache miss 時可從本地 gem cache 複製，不必重新下載）。
+ARG FASTLANE_VERSION=2.233.0
+
 # 設定 Ruby gem 環境：
 # 1) 建立 GEM_HOME 目錄
 # 2) 修正目錄擁有者，避免權限問題
 # 3) 安裝 bundler（-N 不安裝文件）
+# 4) 預裝 fastlane，讓 .gem 檔案快取到 GEM_HOME/cache/
+#    之後 bundle install --path vendor/bundle 時，bundler 優先從本地快取複製，
+#    不需從 rubygems.org 重新下載，cache miss 情況下可節省 1-2 分鐘。
 RUN mkdir -p "${GEM_HOME}" \
  && sudo chown -R "$(whoami)" "${GEM_HOME}" \
- && gem install bundler -N
+ && gem install bundler -N \
+ && gem install fastlane -v "${FASTLANE_VERSION}" -N
 
 # 安裝 Android SDK（固定到 /opt/android/sdk）：
 # 1) 建立 SDK 目錄並修正權限
