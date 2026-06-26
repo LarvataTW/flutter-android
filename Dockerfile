@@ -1,10 +1,10 @@
 FROM cimg/android:2026.03.1
 
-# ---- Flutter 3.35.0 ----
+# ---- Flutter 3.44.4 ----
 ENV PATH="/home/circleci/flutter/bin:${PATH}"
-RUN wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.35.0-stable.tar.xz \
- && tar xf flutter_linux_3.35.0-stable.tar.xz -C ${HOME} \
- && rm -f flutter_linux_3.35.0-stable.tar.xz
+RUN wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.4-stable.tar.xz \
+ && tar xf flutter_linux_3.44.4-stable.tar.xz -C ${HOME} \
+ && rm -f flutter_linux_3.44.4-stable.tar.xz
 RUN ${HOME}/flutter/bin/flutter precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
 
 # ---- 系統工具（含 ninja 備援）----
