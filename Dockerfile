@@ -1,11 +1,18 @@
 FROM cimg/android:2026.03.1
 
-# ---- Flutter 3.44.4 ----
-ENV PATH="/home/circleci/flutter/bin:${PATH}"
-RUN wget -q https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.44.4-stable.tar.xz \
- && tar xf flutter_linux_3.44.4-stable.tar.xz -C ${HOME} \
- && rm -f flutter_linux_3.44.4-stable.tar.xz
-RUN ${HOME}/flutter/bin/flutter precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
+# ---- fvm + Flutter 3.44.4 (fvm-managed) ----
+# Install fvm via the standalone install script (no pre-existing Dart needed).
+# The script drops the binary in ~/fvm/bin; put it on PATH for later layers.
+RUN curl -fsSL https://fvm.app/install.sh | bash
+ENV PATH="/home/circleci/fvm/bin:${PATH}"
+
+# Cache the .fvmrc-pinned SDK inside the image so `fvm install` in CI is a no-op
+# (no per-pipeline download). `fvm global` publishes a `default` symlink so plain
+# `flutter` on PATH also resolves to the same pinned SDK.
+RUN fvm install 3.44.4 --setup \
+ && fvm global 3.44.4
+ENV PATH="/home/circleci/fvm/default/bin:${PATH}"
+RUN flutter precache --android --no-web --no-linux --no-windows --no-fuchsia --no-ios --no-macos
 
 # ---- 系統工具（含 ninja 備援）----
 RUN sudo apt-get update \
@@ -29,3 +36,6 @@ RUN sdkmanager "platform-tools" "cmake;3.22.1" "platforms;android-35" "build-too
 USER root
 RUN mkdir -p /opt/android && ln -sfn /home/circleci/android-sdk /opt/android/sdk
 USER circleci
+
+# ---- 驗證 fvm 與 flutter 皆可用且為 3.44.4 ----
+RUN fvm --version && fvm flutter --version && flutter --version
