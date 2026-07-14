@@ -45,20 +45,25 @@ ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/cmake/3.2
 RUN yes | sdkmanager --licenses >/dev/null || true
 RUN sdkmanager "platform-tools" "cmake;3.22.1" "platforms;android-35" "build-tools;35.0.0"
 
-# ---- (§3a) 預熱 Gradle wrapper distribution（消除每個 build 重抓 gradle-8.12-all.zip ~200MB）----
-# 對應 v5 plan §3。用一個指向 gradle-8.12-all.zip 的 wrapper 跑一次 gradlew，讓 wrapper 用它
-# 自己的雜湊規則把 distribution 解壓到 $GRADLE_USER_HOME/wrapper/dists/…。template 的
-# android/gradle/wrapper/gradle-wrapper.properties 用完全相同的 distributionUrl，雜湊一致
-# → CI build 直接命中，不再下載。（§3b 完整 AGP 相依圖需 build 時取得 template 專案，牽涉
-# 私有 repo 認證，留待後續；此處先消除最大宗的 distribution 下載。）
+# ---- (§3a+§3b) 預熱 Gradle distribution + AGP/Kotlin/Firebase plugin classpath ----
+# 對應 v5 plan §3，用一個 throwaway 專案一次完成兩件事：
+#   §3a：跑指向 gradle-8.12-all.zip 的 wrapper，把 distribution 解到
+#        $GRADLE_USER_HOME/wrapper/dists（template wrapper 用相同 URL → 雜湊一致命中，
+#        不再下載 ~200MB）。
+#   §3b：build.gradle 宣告與 template android/settings.gradle 完全相同版本的
+#        AGP 8.9.1 / Kotlin 2.2.10 / google-services 4.4.2 / crashlytics 3.0.3
+#        （apply false 即會解析並把這些 plugin 的 classpath jar 與傳遞相依下載進 caches）。
+# 注意：app 層 androidx 等相依仍在 CI build 時解析（需完整 template 專案，牽涉私有 repo
+# 認證），此處先蓋住最重、最穩定的 gradle plugin classpath；wall-clock 效益以 §6 量測為準。
 ENV GRADLE_USER_HOME="/home/circleci/.gradle"
 RUN cd /tmp \
  && wget -q https://services.gradle.org/distributions/gradle-8.12-bin.zip \
  && unzip -q gradle-8.12-bin.zip \
  && mkdir -p /tmp/gwarm && cd /tmp/gwarm \
- && touch settings.gradle \
+ && printf 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\n' > settings.gradle \
+ && printf 'plugins {\n  id "com.android.application" version "8.9.1" apply false\n  id "org.jetbrains.kotlin.android" version "2.2.10" apply false\n  id "com.google.gms.google-services" version "4.4.2" apply false\n  id "com.google.firebase.crashlytics" version "3.0.3" apply false\n}\n' > build.gradle \
  && /tmp/gradle-8.12/bin/gradle --no-daemon wrapper --gradle-version 8.12 --distribution-type all \
- && ./gradlew --no-daemon --version \
+ && ./gradlew --no-daemon help \
  && cd / && rm -rf /tmp/gwarm /tmp/gradle-8.12 /tmp/gradle-8.12-bin.zip
 
 # ---- (§4) coverage：lcov_cobertura（CI unit_widget 把 lcov.info 轉成 cobertura.xml）----
