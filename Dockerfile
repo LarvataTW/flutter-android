@@ -56,8 +56,9 @@ RUN cd /tmp \
  && wget -q https://services.gradle.org/distributions/gradle-8.12-bin.zip \
  && unzip -q gradle-8.12-bin.zip \
  && mkdir -p /tmp/gwarm && cd /tmp/gwarm \
- && /tmp/gradle-8.12/bin/gradle wrapper --gradle-version 8.12 --distribution-type all \
- && ./gradlew --version \
+ && touch settings.gradle \
+ && /tmp/gradle-8.12/bin/gradle --no-daemon wrapper --gradle-version 8.12 --distribution-type all \
+ && ./gradlew --no-daemon --version \
  && cd / && rm -rf /tmp/gwarm /tmp/gradle-8.12 /tmp/gradle-8.12-bin.zip
 
 # ---- (§4) coverage：lcov_cobertura（CI unit_widget 把 lcov.info 轉成 cobertura.xml）----
